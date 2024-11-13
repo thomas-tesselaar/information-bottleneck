@@ -9,8 +9,11 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 
+
+
 # Load data
 data = pd.read_csv('spam_data.csv')
+OUT_DIM = 2
 
 def clean_text(text):
     text = re.sub(r'\W', ' ', text)  # Remove all non-word characters
@@ -43,8 +46,8 @@ test_msg_pad = test_msg_pad / 1000.
 
 
 # One-hot encoding of labels
-train_labels = tf.one_hot(train_labels, 2)
-test_labels = tf.one_hot(test_labels, 2)
+train_labels = tf.one_hot(train_labels, OUT_DIM)
+test_labels = tf.one_hot(test_labels, OUT_DIM)
 
 # Probability distributions
 ds = tfp.distributions
@@ -70,7 +73,7 @@ class Encoder(tf.keras.Model):
 class Decoder(tf.keras.Model):
     def __init__(self):
         super(Decoder, self).__init__()
-        self.dense = tf.keras.layers.Dense(2)  # 2 for the 2 output classes
+        self.dense = tf.keras.layers.Dense(OUT_DIM)
 
     def call(self, encoding_sample):
         return self.dense(encoding_sample)
@@ -113,10 +116,6 @@ def evaluate(data, labels):
     encoding = encoder(data)
     sample = encoding.sample()
     logits = decoder(sample)
-    # print(type(encoding))
-    # print(encoding)
-    # print(sample)
-    # print(logits)
     
     correct_prediction = tf.equal(tf.argmax(logits, axis=1), tf.argmax(labels, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -128,17 +127,13 @@ def evaluate(data, labels):
     avg_correct_prediction = tf.equal(tf.argmax(avg_output, axis=1), tf.argmax(labels, axis=1))
     avg_accuracy = tf.reduce_mean(tf.cast(avg_correct_prediction, tf.float32))
     
-    # print(data)
-    # print(labels)
-    # print(encoding)
-    # print(logits)
-    IZY_bound = math.log(2, 2) - compute_loss(data, labels, encoding, logits)[1]
+    IZY_bound = math.log(OUT_DIM, 2) - compute_loss(data, labels, encoding, logits)[1]
     IZX_bound = compute_loss(data, labels, encoding, logits)[2]
     
     return IZY_bound.numpy(), IZX_bound.numpy(), accuracy.numpy(), avg_accuracy.numpy()
 
 # Training loop
-epochs = 10
+epochs = 20
 batch_size = 50
 steps_per_batch = len(train_msg_pad) // batch_size
 
