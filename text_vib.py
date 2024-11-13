@@ -36,6 +36,11 @@ train_msg_pad = tf.keras.preprocessing.sequence.pad_sequences(train_msg_seq, pad
                                                               truncating='post', maxlen=maxlen)
 test_msg_pad = tf.keras.preprocessing.sequence.pad_sequences(test_msg_seq, padding='post', 
                                                              truncating='post', maxlen=maxlen)
+# TODO normalize by number of tokens
+# normalize
+train_msg_pad = train_msg_pad / 1000.
+test_msg_pad = test_msg_pad / 1000.
+
 
 # One-hot encoding of labels
 train_labels = tf.one_hot(train_labels, 2)
@@ -52,8 +57,8 @@ class Encoder(tf.keras.Model):
         self.second_hidden_layer = tf.keras.layers.Dense(32, activation='relu')
         self.output_layer = tf.keras.layers.Dense(4)  # 2 for mu and 2 for rho
     
-    def call(self, images):
-        x = self.first_hidden_layer(2 * images - 1)
+    def call(self, data):
+        x = self.first_hidden_layer(2 * data - 1)
         x = self.second_hidden_layer(x)
         output = self.output_layer(x)
 
@@ -108,6 +113,10 @@ def evaluate(data, labels):
     encoding = encoder(data)
     sample = encoding.sample()
     logits = decoder(sample)
+    # print(type(encoding))
+    # print(encoding)
+    # print(sample)
+    # print(logits)
     
     correct_prediction = tf.equal(tf.argmax(logits, axis=1), tf.argmax(labels, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -119,6 +128,10 @@ def evaluate(data, labels):
     avg_correct_prediction = tf.equal(tf.argmax(avg_output, axis=1), tf.argmax(labels, axis=1))
     avg_accuracy = tf.reduce_mean(tf.cast(avg_correct_prediction, tf.float32))
     
+    # print(data)
+    # print(labels)
+    # print(encoding)
+    # print(logits)
     IZY_bound = math.log(2, 2) - compute_loss(data, labels, encoding, logits)[1]
     IZX_bound = compute_loss(data, labels, encoding, logits)[2]
     
