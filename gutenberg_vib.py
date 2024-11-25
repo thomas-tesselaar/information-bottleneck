@@ -9,11 +9,18 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 
-
+OUT_DIM = 2
+DATA_PATH = "/Users/thomastesselaar/Downloads/MTHE493PreProcessing"
 
 # Load data
-data = pd.read_csv('spam_data.csv')
-OUT_DIM = 2
+files = ["100.txt","1016.txt","1030.txt","10039.txt","10615.txt","10616.txt","1079.txt","1080.txt","1090.txt",
+         "10010.txt","10069.txt","10072.txt","10075.txt","10318.txt","10357.txt","10451.txt","102.txt","103.txt",
+         "105.txt","107.txt","1015.txt","1017.txt","1022.txt","1023.txt","1024.txt","1026.txt","101.txt","106.txt",
+         "108.txt","109.txt","1013.txt","1014.txt","1021.txt","1027.txt","1029.txt","1031.txt"]
+flabels = [1,1,1,1,1,1,1,1729,1707,
+           1,1,1,1,1,1,1,2,2,
+           2,2,2,2,2,2,2,2,2,2,
+           2,2,2,2,2,2,2,2]
 
 def clean_text(text):
     text = re.sub(r'\W', ' ', text)  # Remove all non-word characters
@@ -21,9 +28,19 @@ def clean_text(text):
     text = text.strip()  # Remove leading and trailing spaces
     return text
 
-data['Message'] = data['Message'].apply(clean_text)
-data['label'] = np.where(data['Category']=='ham', 0, 1)
-train_msg, test_msg, train_labels, test_labels = train_test_split(data['Message'], data['label'], test_size=0.2)
+texts = []
+labels = []
+for i, fname in enumerate(files):
+    book = open(f"{DATA_PATH}/{fname}", encoding='utf-8')
+    text = book.read()
+    paragraphs = [clean_text(x) for x in text.split('\n\n') if len(x)>300]
+    texts += paragraphs
+    labels += [0 if flabels[i]==2 else 1] * len(paragraphs)
+
+
+
+data = pd.DataFrame({'text':texts, 'label':labels})
+train_msg, test_msg, train_labels, test_labels = train_test_split(data['text'], data['label'], test_size=0.2)
 
 # learn tokens
 tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=1000, oov_token='<OOV>')
@@ -34,7 +51,7 @@ train_msg_seq = tokenizer.texts_to_sequences(train_msg)
 test_msg_seq = tokenizer.texts_to_sequences(test_msg)
 
 # add padding
-maxlen = 50
+maxlen = 500
 train_msg_pad = tf.keras.preprocessing.sequence.pad_sequences(train_msg_seq, padding='post', 
                                                               truncating='post', maxlen=maxlen)
 test_msg_pad = tf.keras.preprocessing.sequence.pad_sequences(test_msg_seq, padding='post', 
@@ -56,13 +73,17 @@ ds = tfp.distributions
 class Encoder(tf.keras.Model):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.first_hidden_layer = tf.keras.layers.Dense(32, activation='relu')
-        self.second_hidden_layer = tf.keras.layers.Dense(32, activation='relu')
+        self.first_hidden_layer = tf.keras.layers.Dense(128, activation='relu')
+        self.second_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
+        self.third_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
+        self.fourth_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
         self.output_layer = tf.keras.layers.Dense(4)  # 2 for mu and 2 for rho
     
     def call(self, data):
         x = self.first_hidden_layer(2 * data - 1)
         x = self.second_hidden_layer(x)
+        x = self.third_hidden_layer(x)
+        x = self.fourth_hidden_layer(x)
         output = self.output_layer(x)
 
         mu, rho = output[:, :2], output[:, 2:]
@@ -88,7 +109,7 @@ prior = ds.Normal(0.0, 1.0)
 # Define the loss functions and metrics
 BETA = 10**(-0.5)
 
-def compute_loss(images, labels, encoding, logits):
+def compute_loss(labels, encoding, logits):
     class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
     info_loss = tf.reduce_mean(tfp.distributions.kl_divergence(encoding, prior)) / math.log(2)
     total_loss = class_loss + BETA * info_loss
@@ -104,7 +125,7 @@ def train_step(images, labels):
         encoding = encoder(images)
         sample = encoding.sample()
         logits = decoder(sample)
-        total_loss, class_loss, info_loss = compute_loss(images, labels, encoding, logits)
+        total_loss, class_loss, info_loss = compute_loss(labels, encoding, logits)
     
     # Get the trainable variables from both encoder and decoder models
     gradients = tape.gradient(total_loss, encoder.trainable_variables + decoder.trainable_variables)
@@ -127,13 +148,13 @@ def evaluate(data, labels):
     avg_correct_prediction = tf.equal(tf.argmax(avg_output, axis=1), tf.argmax(labels, axis=1))
     avg_accuracy = tf.reduce_mean(tf.cast(avg_correct_prediction, tf.float32))
     
-    IZY_bound = math.log(OUT_DIM, 2) - compute_loss(data, labels, encoding, logits)[1]
-    IZX_bound = compute_loss(data, labels, encoding, logits)[2]
+    IZY_bound = math.log(OUT_DIM, 2) - compute_loss(labels, encoding, logits)[1]
+    IZX_bound = compute_loss(labels, encoding, logits)[2]
     
     return IZY_bound.numpy(), IZX_bound.numpy(), accuracy.numpy(), avg_accuracy.numpy()
 
 # Training loop
-epochs = 20
+epochs = 10
 batch_size = 50
 steps_per_batch = len(train_msg_pad) // batch_size
 
