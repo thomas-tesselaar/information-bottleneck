@@ -12,15 +12,17 @@ import tensorflow_probability as tfp
 OUT_DIM = 2
 DATA_PATH = "/Users/thomastesselaar/Downloads/MTHE493PreProcessing"
 
-# Load data
+# ======================
+# ==== Loading Data ====
+# ======================
 files = ["100.txt","1016.txt","1030.txt","10039.txt","10615.txt","10616.txt","1079.txt","1080.txt","1090.txt",
          "10010.txt","10069.txt","10072.txt","10075.txt","10318.txt","10357.txt","10451.txt","102.txt","103.txt",
          "105.txt","107.txt","1015.txt","1017.txt","1022.txt","1023.txt","1024.txt","1026.txt","101.txt","106.txt",
          "108.txt","109.txt","1013.txt","1014.txt","1021.txt","1027.txt","1029.txt","1031.txt"]
 flabels = [1,1,1,1,1,1,1,1729,1707,
-           1,1,1,1,1,1,1,2,2,
-           2,2,2,2,2,2,2,2,2,2,
-           2,2,2,2,2,2,2,2]
+           1,1,1,1,1,1,1,1894,1873,
+           1818,1874,1847,1891,1851,1853,1892,1892,1992,1919,
+           1905,1912,1901,1907,1914,1915,1916,1913]
 
 def clean_text(text):
     text = re.sub(r'\W', ' ', text)  # Remove all non-word characters
@@ -33,10 +35,11 @@ labels = []
 for i, fname in enumerate(files):
     book = open(f"{DATA_PATH}/{fname}", encoding='utf-8')
     text = book.read()
+    # if flabels[i] > 1800:
     paragraphs = [clean_text(x) for x in text.split('\n\n') if len(x)>300]
     texts += paragraphs
-    labels += [0 if flabels[i]==2 else 1] * len(paragraphs)
-
+    labels += [0 if flabels[i]<1800 else 1] * len(paragraphs)
+        # labels += [0 if flabels[i]>1900 else 1] * len(paragraphs)
 
 
 data = pd.DataFrame({'text':texts, 'label':labels})
@@ -61,7 +64,6 @@ test_msg_pad = tf.keras.preprocessing.sequence.pad_sequences(test_msg_seq, paddi
 train_msg_pad = train_msg_pad / 1000.
 test_msg_pad = test_msg_pad / 1000.
 
-
 # One-hot encoding of labels
 train_labels = tf.one_hot(train_labels, OUT_DIM)
 test_labels = tf.one_hot(test_labels, OUT_DIM)
@@ -69,14 +71,22 @@ test_labels = tf.one_hot(test_labels, OUT_DIM)
 # Probability distributions
 ds = tfp.distributions
 
+# ============================
+# ==== Defining functions ====
+# ============================
+# TODO these are constant across implementations
+#      they should be moved to another file
+
 # define Encoder
 class Encoder(tf.keras.Model):
     def __init__(self):
         super(Encoder, self).__init__()
         self.first_hidden_layer = tf.keras.layers.Dense(128, activation='relu')
         self.second_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
-        self.third_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
-        self.fourth_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
+        self.third_hidden_layer = tf.keras.layers.Dense(32, activation='relu')
+        self.fourth_hidden_layer = tf.keras.layers.Dense(16, activation='relu')
+        self.fifth_hidden_layer = tf.keras.layers.Dense(8, activation='relu')
+        # self.sixth_hidden_layer = tf.keras.layers.Dense(8, activation='relu')
         self.output_layer = tf.keras.layers.Dense(4)  # 2 for mu and 2 for rho
     
     def call(self, data):
@@ -84,6 +94,8 @@ class Encoder(tf.keras.Model):
         x = self.second_hidden_layer(x)
         x = self.third_hidden_layer(x)
         x = self.fourth_hidden_layer(x)
+        x = self.fifth_hidden_layer(x)
+        # x = self.sixth_hidden_layer(x)
         output = self.output_layer(x)
 
         mu, rho = output[:, :2], output[:, 2:]
@@ -99,6 +111,10 @@ class Decoder(tf.keras.Model):
     def call(self, encoding_sample):
         return self.dense(encoding_sample)
 
+
+# betas = [10**x for x in [-7,-6.5,-6,-5.5,-5,-4.5,-4,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1]]
+# beta_accuracy = []
+# for BETA in betas:
 # Instantiate the encoder and decoder
 encoder = Encoder()
 decoder = Decoder()
@@ -107,7 +123,7 @@ decoder = Decoder()
 prior = ds.Normal(0.0, 1.0)
 
 # Define the loss functions and metrics
-BETA = 10**(-0.5)
+BETA = 10**-3
 
 def compute_loss(labels, encoding, logits):
     class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
@@ -154,7 +170,7 @@ def evaluate(data, labels):
     return IZY_bound.numpy(), IZX_bound.numpy(), accuracy.numpy(), avg_accuracy.numpy()
 
 # Training loop
-epochs = 10
+epochs = 15
 batch_size = 50
 steps_per_batch = len(train_msg_pad) // batch_size
 
@@ -207,4 +223,6 @@ res = pd.DataFrame({
 
 res.to_csv('model_results.csv', index=False)
 
+# beta_accuracy.append(res.iloc[-1,-2])
 
+# pd.DataFrame({'beta':betas,'accuracy':beta_accuracy}).to_csv('beta_accuracy.csv', index=False)
