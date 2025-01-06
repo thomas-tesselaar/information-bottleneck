@@ -8,7 +8,7 @@ import tensorflow as tf
 from transformers import AutoTokenizer
 
 OUT_DIM = 2
-DATA_PATH = "/Users/thomastesselaar/Downloads/MTHE493PreProcessing"
+DATA_PATH = "./data"
 
 files = ["100.txt","1016.txt","1030.txt","10039.txt","10615.txt","10616.txt","1079.txt","1080.txt","1090.txt",
          "10010.txt","10069.txt","10072.txt","10075.txt","10318.txt","10357.txt","10451.txt","102.txt","103.txt",
