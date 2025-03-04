@@ -101,7 +101,7 @@ class VIB:
         alpha : float
             Order of the Renyi divergence
         """
-        steps_per_batch = len(data) // batch_size
+        steps_per_batch = len(data['train_data']) // batch_size
 
         # Keep track of history
         train_results = {'Train IZY':[], 'Train IZX':[], 'Train acc':[], 'Train avg_acc':[]}
@@ -130,14 +130,14 @@ class VIB:
         res = merge_dicts({'Epochs':np.arange(epochs)+1}, train_results, test_results)
         return pd.DataFrame(res)
 
-    def compute_loss(self, labels, encoding, logits, beta: float, alpha: float):
+    def compute_loss(self, labels, encoding, logits, beta: float, alpha: float = 1):
         class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
-        info_loss = tf.reduce_mean(tfp.distributions.renyi_divergence(encoding, self.prior, alpha=alpha)) / math.log(2)
+        info_loss = tf.reduce_mean(tfp.distributions.kl_divergence(encoding, self.prior)) / math.log(2)
         total_loss = class_loss + beta * info_loss
         return total_loss, class_loss, info_loss
     
     @tf.function
-    def train_step(self, images, labels, beta: float, alpha: float):
+    def train_step(self, images, labels, beta: float, alpha: float = 1):
         with tf.GradientTape() as tape:
             encoding = self.encoder(images)
             sample = encoding.sample()
@@ -149,7 +149,7 @@ class VIB:
         self.optimizer.apply_gradients(zip(gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
         return total_loss, class_loss, info_loss
     
-    def evaluate(self, data, labels, beta: float, alpha: float):
+    def evaluate(self, data, labels, beta: float, alpha: float = 1):
         encoding = self.encoder(data)
         sample = encoding.sample()
         logits = self.decoder(sample)
@@ -179,7 +179,7 @@ if __name__ == '__main__':
 
     # Instantiate the model
     vib = VIB(encoder_args={'num_layers':3, 'num_units':[128,64,32]})
-
+    
     # Train the model
-    res = vib.train(data, epochs=10, batch_size=50, beta=10**-3, alpha=1.0)
+    res = vib.train(data, epochs=15, batch_size=50, beta=10**-4, alpha=1.0)
     print(res)
