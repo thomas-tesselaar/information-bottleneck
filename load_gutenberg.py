@@ -52,7 +52,7 @@ class Gutenberg:
         train_msg_raw, test_msg_raw, train_labels, test_labels = train_test_split(data['text'], data['label'], test_size=0.2)
 
         # learn and tokenize tokens
-        if tokenizer_name.lower() == tf:
+        if tokenizer_name.lower() == 'tf':
             tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=num_tokens, oov_token='<OOV>')
             tokenizer.fit_on_texts(train_msg_raw)
             train_msg_seq = tokenizer.texts_to_sequences(train_msg_raw)

@@ -34,13 +34,16 @@ class Encoder(tf.keras.Model):
         self.num_layers = num_layers
         self.latent_dim = latent_dim
 
+        self.embed = tf.keras.layers.Embedding(input_dim=1000, output_dim=64, input_length=500)
+        self.flatten = tf.keras.layers.Flatten()
         self._layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
                             for i in range(num_layers)]
         self.output_layer = tf.keras.layers.Dense(latent_dim*2) # mu and rho for each latent dimension
     
     def call(self, data):
-        x = self._layers[0](2 * data - 1)
-        for i in range(1, self.num_layers):
+        # x = self._layers[0](2 * data - 1)
+        x = self.flatten(self.embed(data))
+        for i in range(0, self.num_layers):
             x = self._layers[i](x)
         output = self.output_layer(x)
 
@@ -172,7 +175,7 @@ class VIB:
 
 if __name__ == '__main__':
     # load the data
-    gutenberg = Gutenberg()
+    gutenberg = Gutenberg(normalize=False)
     train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data()
     data = {'train_data': train_msg_pad, 'test_data': test_msg_pad, 
             'train_labels': train_labels, 'test_labels': test_labels}
@@ -181,5 +184,5 @@ if __name__ == '__main__':
     vib = VIB(encoder_args={'num_layers':3, 'num_units':[128,64,32]})
     
     # Train the model
-    res = vib.train(data, epochs=15, batch_size=50, beta=10**-4, alpha=1.0)
+    res = vib.train(data, epochs=25, batch_size=50, beta=10**-4, alpha=1.0)
     print(res)
