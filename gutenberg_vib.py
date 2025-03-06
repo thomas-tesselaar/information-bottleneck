@@ -28,6 +28,8 @@ ds = tfp.distributions
 class Encoder(tf.keras.Model):
     def __init__(self):
         super(Encoder, self).__init__()
+        self.embed = tf.keras.layers.Embedding(input_dim=1000, output_dim=64, input_length=500)
+        self.flatten = tf.keras.layers.Flatten()
         self.first_hidden_layer = tf.keras.layers.Dense(128, activation='relu')
         self.second_hidden_layer = tf.keras.layers.Dense(64, activation='relu')
         # self.third_hidden_layer = tf.keras.layers.Dense(32, activation='relu')
@@ -37,7 +39,8 @@ class Encoder(tf.keras.Model):
         self.output_layer = tf.keras.layers.Dense(4)  # 2 for mu and 2 for rho
     
     def call(self, data):
-        x = self.first_hidden_layer(2 * data - 1)
+        x = self.flatten(self.embed(data)) # * data - 1
+        x = self.first_hidden_layer(x)
         x = self.second_hidden_layer(x)
         # x = self.third_hidden_layer(x)
         # x = self.fourth_hidden_layer(x)
@@ -59,7 +62,8 @@ class Decoder(tf.keras.Model):
         return self.dense(encoding_sample)
 
 
-betas = [10**x for x in [-6,-5.5,-5,-4.5,-4,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2]]
+#betas = [10**x for x in [-6,-5.5,-5,-4.5,-4,-3.5,-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2]]
+betas = [10**-4]
 beta_train_accuracy = []
 beta_test_accuracy = []
 try:
@@ -67,7 +71,7 @@ try:
         tmp_train_acc = []
         tmp_test_acc = []
 
-        for i in range(50):
+        for i in range(5):
             # Instantiate the encoder and decoder
             encoder = Encoder()
             decoder = Decoder()

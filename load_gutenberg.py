@@ -47,12 +47,12 @@ class Gutenberg:
         return pd.DataFrame({'text':texts, 'label':labels})
     
 
-    def preprocess(self, data: pd.DataFrame, num_tokens: int = 1000, pad: bool = True, normalize: bool = True, 
+    def preprocess(self, data: pd.DataFrame, num_tokens: int = 1000, pad: bool = True, normalize: bool = False, 
                    maxlen: int = 500, tokenizer_name: str = 'tf', **kwargs):
         train_msg_raw, test_msg_raw, train_labels, test_labels = train_test_split(data['text'], data['label'], test_size=0.2)
 
         # learn and tokenize tokens
-        if tokenizer_name.lower() == tf:
+        if tokenizer_name.lower() == 'tf':
             tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=num_tokens, oov_token='<OOV>')
             tokenizer.fit_on_texts(train_msg_raw)
             train_msg_seq = tokenizer.texts_to_sequences(train_msg_raw)
@@ -76,6 +76,15 @@ class Gutenberg:
         if normalize:
             train_msg = train_msg / float(num_tokens)
             test_msg = test_msg / float(num_tokens)
+        
+        oov_count = sum(token == 1 for seq in train_msg for token in seq)
+        total_tokens = sum(len(seq) for seq in train_msg)
+
+        oov_percentage = (oov_count / total_tokens) * 100 if total_tokens > 0 else 0
+
+        print(f"Total Tokens: {total_tokens}")
+        print(f"OOV Tokens: {oov_count}")
+        print(f"OOV Percentage: {oov_percentage:.2f}%")
 
         # One-hot encoding of labels
         train_labels = tf.one_hot(train_labels, OUT_DIM)
