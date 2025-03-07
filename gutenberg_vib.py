@@ -10,11 +10,9 @@ from load_gutenberg import Gutenberg
 from vib import VIB
 
 
-OUT_DIM = 2
-
 # load data
 gutenberg = Gutenberg()
-train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data()
+train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data(normalize=False)
 data = {'train_data': train_msg_pad, 'test_data': test_msg_pad, 
         'train_labels': train_labels, 'test_labels': test_labels}
 

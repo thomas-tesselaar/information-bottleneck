@@ -16,7 +16,7 @@ ds = tfp.distributions
 # ============================
 class Encoder(tf.keras.Model):
     def __init__(self, num_layers: int = 2, num_units: Union[int, list[int]] = 128, 
-                 latent_dim: int = 2):
+                 latent_dim: int = 2, use_embedding: bool = True):
         """
         Parameters
         ----------
@@ -33,18 +33,21 @@ class Encoder(tf.keras.Model):
             num_units = [num_units] * num_layers
         self.num_layers = num_layers
         self.latent_dim = latent_dim
+        self.use_embedding = use_embedding
 
-        self.embed = tf.keras.layers.Embedding(input_dim=1000, output_dim=64, input_length=500)
-        self.flatten = tf.keras.layers.Flatten()
-        self._layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
+        if self.use_embedding:
+            self.embed = tf.keras.layers.Embedding(input_dim=1000, output_dim=64)
+            self.flatten = tf.keras.layers.Flatten()
+        self.hidden_layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
                             for i in range(num_layers)]
         self.output_layer = tf.keras.layers.Dense(latent_dim*2) # mu and rho for each latent dimension
     
     def call(self, data):
         # x = self._layers[0](2 * data - 1)
-        x = self.flatten(self.embed(data))
+        if self.use_embedding:
+            x = self.flatten(self.embed(data))
         for i in range(0, self.num_layers):
-            x = self._layers[i](x)
+            x = self.hidden_layers[i](x)
         output = self.output_layer(x)
 
         mu, rho = output[:, :self.latent_dim], output[:, self.latent_dim:]
@@ -63,13 +66,13 @@ class Decoder(tf.keras.Model):
         self.num_layers = num_layers
         self.out_dim = out_dim
 
-        self._layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
+        self.hidden_layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
                             for i in range(num_layers)]
         self.dense = tf.keras.layers.Dense(out_dim)
 
     def call(self, encoding_sample):
         for i in range(self.num_layers):
-            encoding_sample = self._layers[i](encoding_sample)
+            encoding_sample = self.hidden_layers[i](encoding_sample)
         return self.dense(encoding_sample)
 
 
@@ -78,6 +81,16 @@ def merge_dicts(*dicts):
     for d in dicts:
         res.update(d)
     return res
+
+
+def renyi_divergence(p, q, alpha):
+    if alpha == 1.0:
+        return tfp.distributions.kl_divergence(p, q)
+    elif alpha == float('inf'):
+        return tf.reduce_max(p.log_prob(p.sample()) - q.log_prob(p.sample()))
+    else:
+        log_diff = p.log_prob(p.sample()) - q.log_prob(p.sample())
+        return (1 / (alpha - 1)) * tf.reduce_logsumexp((alpha - 1) * log_diff)
 
 
 class VIB:
@@ -135,7 +148,8 @@ class VIB:
 
     def compute_loss(self, labels, encoding, logits, beta: float, alpha: float = 1):
         class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
-        info_loss = tf.reduce_mean(tfp.distributions.kl_divergence(encoding, self.prior)) / math.log(2)
+        # info_loss = tf.reduce_mean(tfp.distributions.kl_divergence(encoding, self.prior)) / math.log(2)
+        info_loss = tf.reduce_mean(renyi_divergence(encoding, self.prior, alpha)) / math.log(2)
         total_loss = class_loss + beta * info_loss
         return total_loss, class_loss, info_loss
     
@@ -175,13 +189,13 @@ class VIB:
 
 if __name__ == '__main__':
     # load the data
-    gutenberg = Gutenberg(normalize=False)
-    train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data()
+    gutenberg = Gutenberg()
+    train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data(normalize=False)
     data = {'train_data': train_msg_pad, 'test_data': test_msg_pad, 
             'train_labels': train_labels, 'test_labels': test_labels}
 
     # Instantiate the model
-    vib = VIB(encoder_args={'num_layers':3, 'num_units':[128,64,32]})
+    vib = VIB(encoder_args={'num_layers':2, 'num_units':[128,64]})
     
     # Train the model
     res = vib.train(data, epochs=25, batch_size=50, beta=10**-4, alpha=1.0)
