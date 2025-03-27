@@ -2,15 +2,7 @@
 
 Write abstract here
 
-Andrew Sutcliffe (20226770)
-
-Hamish Spence (20291224)
-
-Kyle Dong (20278928)
-
-Joshua Geddes (20286972)
-
-Thomas Tesselaar (20233228)
+Andrew Sutcliffe, Hamish Spence, Kyle Dong, Joshua Geddes, Thomas Tesselaar
 
 ## Setup Instructions
 
