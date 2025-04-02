@@ -10,6 +10,7 @@ from transformers import AutoTokenizer
 OUT_DIM = 2
 DATA_PATH = "./data"
 
+#These files come from data folder in repository. Could be rewritten to include more files or expanded to a larger dataset
 files = ["100.txt","1016.txt","1030.txt","10039.txt","10615.txt","10616.txt","1079.txt","1080.txt","1090.txt",
          "10010.txt","10069.txt","10072.txt","10075.txt","10318.txt","10357.txt","10451.txt","102.txt","103.txt",
          "105.txt","107.txt","1015.txt","1017.txt","1022.txt","1023.txt","1024.txt","1026.txt","101.txt","106.txt",
@@ -19,6 +20,7 @@ flabels = [1,1,1,1,1,1,1,1729,1707,
            1818,1874,1847,1891,1851,1853,1892,1892,1992,1919,
            1905,1912,1901,1907,1914,1915,1916,1913]
 
+#Function to strip text, ensures compatability with tokenizer
 def clean_text(text):
     text = re.sub(r'\W', ' ', text)  # Remove all non-word characters
     text = re.sub(r'\s+', ' ', text)  # Remove multiple spaces
@@ -32,13 +34,14 @@ class Gutenberg:
         return self.preprocess(data, **kwargs)
 
 
+#This function reads each book, groups into paragraphs, and strips of white space and unreadable characters, and creates text with year labels
     def load_data(self) -> pd.DataFrame:
         texts = []
         labels = []
         for i, fname in enumerate(files):
             book = open(f"{DATA_PATH}/{fname}", encoding='utf-8')
             text = book.read()
-            # if flabels[i] > 1800:
+            # Binary label is if book is before or after 1800
             paragraphs = [clean_text(x) for x in text.split('\n\n') if len(x)>300]
             texts += paragraphs
             labels += [0 if flabels[i]<1800 else 1] * len(paragraphs)
@@ -53,16 +56,18 @@ class Gutenberg:
 
         # learn and tokenize tokens
         if tokenizer_name.lower() == 'tf':
+                 #About 5% of tokens are mapped to <OOV>
             tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=num_tokens, oov_token='<OOV>')
             tokenizer.fit_on_texts(train_msg_raw)
             train_msg_seq = tokenizer.texts_to_sequences(train_msg_raw)
             test_msg_seq = tokenizer.texts_to_sequences(test_msg_raw)
         else:
+                 #Bert tokenizer not reccomended since the size of the vocab is unsuitable for embeddings when training
             tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
             train_msg_seq = tokenizer(train_msg_raw.to_list(), truncation=True, padding=True, max_length=512)["input_ids"]
             test_msg_seq = tokenizer(test_msg_raw.to_list(), truncation=True, padding=True, max_length=512)["input_ids"]
 
-        # add padding
+        # add padding, this ensures that sequences are all equal to 500, compatibility with training
         if pad and tokenizer_name.lower() != 'bert':
             train_msg = tf.keras.preprocessing.sequence.pad_sequences(train_msg_seq, padding='post', 
                                                                         truncating='post', maxlen=maxlen)
