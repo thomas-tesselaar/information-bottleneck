@@ -35,6 +35,7 @@ class Encoder(tf.keras.Model):
         self.latent_dim = latent_dim
         self.use_embedding = use_embedding
 
+        #Using text embeddings is highly reccomended in this classification project. See thesis for more
         if self.use_embedding:
             self.embed = tf.keras.layers.Embedding(input_dim=1000, output_dim=64)
             self.flatten = tf.keras.layers.Flatten()
@@ -45,11 +46,13 @@ class Encoder(tf.keras.Model):
     def call(self, data):
         # x = self._layers[0](2 * data - 1)
         if self.use_embedding:
+            #Flatten layer enables compatibility with future hidden layers
             x = self.flatten(self.embed(data))
         for i in range(0, self.num_layers):
             x = self.hidden_layers[i](x)
         output = self.output_layer(x)
 
+        #mu and rho are used to representation encoded distribution in latent space
         mu, rho = output[:, :self.latent_dim], output[:, self.latent_dim:]
         encoding = ds.Normal(loc=mu, scale=tf.nn.softplus(rho - 5.0))
         return encoding
@@ -68,6 +71,7 @@ class Decoder(tf.keras.Model):
 
         self.hidden_layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
                             for i in range(num_layers)]
+        #Final layer projects to the output dimension, or the number of classes to predict from
         self.dense = tf.keras.layers.Dense(out_dim)
 
     def call(self, encoding_sample):
@@ -85,6 +89,7 @@ def merge_dicts(*dicts):
 
 def renyi_divergence(p, q, alpha):
     if alpha == 1.0:
+        #if alpha = 1, renyi is just kl
         return tfp.distributions.kl_divergence(p, q)
     elif alpha == float('inf'):
         return tf.reduce_max(p.log_prob(p.sample()) - q.log_prob(p.sample()))
@@ -98,6 +103,7 @@ class VIB:
         self.encoder = Encoder(**encoder_args)
         self.decoder = Decoder(**decoder_args)
         self.prior = ds.Normal(0.0, 1.0)
+        #Optimizer is used with default Adam configuration
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
     def train(self, data:dict[str, np.array], epochs: int = 25, 
@@ -146,6 +152,7 @@ class VIB:
         res = merge_dicts({'Epochs':np.arange(epochs)+1}, train_results, test_results)
         return pd.DataFrame(res)
 
+    #See thesis for further explanation of this loss function
     def compute_loss(self, labels, encoding, logits, beta: float, alpha: float = 1):
         class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
         # info_loss = tf.reduce_mean(tfp.distributions.kl_divergence(encoding, self.prior)) / math.log(2)
@@ -156,6 +163,7 @@ class VIB:
     @tf.function
     def train_step(self, images, labels, beta: float, alpha: float = 1):
         with tf.GradientTape() as tape:
+            #We train both the encoder and decoder together, compute loss from decoder output, and backpropagate through entire network
             encoding = self.encoder(images)
             sample = encoding.sample()
             logits = self.decoder(sample)
@@ -170,7 +178,9 @@ class VIB:
         encoding = self.encoder(data)
         sample = encoding.sample()
         logits = self.decoder(sample)
-        
+
+        #When training, softmax is applied, so model learns that higher output value corresponds to higher confidence in specific class
+        #Therefore, we can take highest value as our predicted class (argmax)
         correct_prediction = tf.equal(tf.argmax(logits, axis=1), tf.argmax(labels, axis=1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         
