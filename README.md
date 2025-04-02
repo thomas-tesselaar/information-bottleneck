@@ -4,6 +4,8 @@ Write abstract here
 
 Andrew Sutcliffe, Hamish Spence, Kyle Dong, Joshua Geddes, Thomas Tesselaar
 
+The core implementations of this project are in the `vib.py` and `load_gutenberg.py` files, which are commented extensively for future analysis and expansion. The remaining scripts were previous iterations of the projects and scripts designed for assessing various model configurations.
+
 ## Setup Instructions
 
 ### 1. Create and Activate Virtual Environment
