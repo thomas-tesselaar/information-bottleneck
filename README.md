@@ -32,3 +32,21 @@ python vib.py
 ```sh
 deactivate
 ```
+
+## File Descriptions
+
+| File Name                 | Description                                                                                  |
+|---------------------------|----------------------------------------------------------------------------------------------|
+| `adam_vib.py`             | Implementation of VIB from a previous student research project focused on spam classification.           |
+| `alpha_tuning.py`         | Script for tuning the alpha parameter in the VIB model.                                      |
+| `alpha_tuning_results.csv`| Stores results from the alpha tuning experiments.                                            |
+| `beta_accuracy.csv`       | Contains accuracy metrics corresponding to different beta values in the VIB model.           |
+| `gutenberg_vib.py`        | Script for training VIB model on various beta values.                               |
+| `load_gutenberg.py`       | Utility functions for loading and preprocessing the Gutenberg dataset.                       |
+| `model_results.csv`       | Records performance metrics of various model configurations.                                 |
+| `model_results2.csv`      | Additional results from alternate model config.                                                   |
+| `requirements.txt`        | Lists the Python dependencies required to run the project.                                   |
+| `spam_data.csv`           | Dataset containing spam detection data used in the project.                                  |
+| `spam_detection_vib.py`   | Implements the VIB model for spam detection tasks.                                           |
+| `transformer.py`          | Transformer experiments with VIB on Gutenberg dataset                     |
+| `vib.py`                  | Core implementation of the Variational Information Bottleneck model.                         |
