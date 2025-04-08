@@ -14,8 +14,8 @@ files = ["100.txt","1016.txt","1030.txt","10039.txt","10615.txt","10616.txt","10
          "10010.txt","10069.txt","10072.txt","10075.txt","10318.txt","10357.txt","10451.txt","102.txt","103.txt",
          "105.txt","107.txt","1015.txt","1017.txt","1022.txt","1023.txt","1024.txt","1026.txt","101.txt","106.txt",
          "108.txt","109.txt","1013.txt","1014.txt","1021.txt","1027.txt","1029.txt","1031.txt"]
-flabels = [1,1,1,1,1,1,1,1729,1707,
-           1,1,1,1,1,1,1,1894,1873,
+flabels = [1623,1600,1600,1600,1600,1600,1700,1729,1707,
+           1700,1775,1764,1798,1784,1784,1774,1894,1873,
            1818,1874,1847,1891,1851,1853,1892,1892,1992,1919,
            1905,1912,1901,1907,1914,1915,1916,1913]
 
@@ -32,23 +32,24 @@ class Gutenberg:
         return self.preprocess(data, **kwargs)
 
 
-    def load_data(self) -> pd.DataFrame:
+    def load_data(self, min_words: int = 300) -> pd.DataFrame:
         texts = []
         labels = []
         for i, fname in enumerate(files):
             book = open(f"{DATA_PATH}/{fname}", encoding='utf-8')
             text = book.read()
             # if flabels[i] > 1800:
-            paragraphs = [clean_text(x) for x in text.split('\n\n') if len(x)>300]
+            paragraphs = [clean_text(x) for x in text.split('\n\n') if len(x)>min_words]
             texts += paragraphs
-            labels += [0 if flabels[i]<1800 else 1] * len(paragraphs)
-                # labels += [0 if flabels[i]>1900 else 1] * len(paragraphs)
+            # labels += [0 if flabels[i]<1800 else 1 if flabels[i]<1900 else 2] * len(paragraphs)
+            # labels += [flabels[i]//100 - 16] * len(paragraphs)
+            labels += [0 if flabels[i]>1800 else 1] * len(paragraphs)
 
         return pd.DataFrame({'text':texts, 'label':labels})
     
 
-    def preprocess(self, data: pd.DataFrame, num_tokens: int = 1000, pad: bool = True, normalize: bool = True, 
-                   maxlen: int = 500, tokenizer_name: str = 'tf', **kwargs):
+    def preprocess(self, data: pd.DataFrame, num_tokens: int = 2048, pad: bool = True, normalize: bool = True, 
+                   maxlen: int = 500, tokenizer_name: str = 'tf', verbose: bool = False, **kwargs):
         train_msg_raw, test_msg_raw, train_labels, test_labels = train_test_split(data['text'], data['label'], test_size=0.2)
 
         # learn and tokenize tokens
@@ -59,8 +60,8 @@ class Gutenberg:
             test_msg_seq = tokenizer.texts_to_sequences(test_msg_raw)
         else:
             tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            train_msg_seq = tokenizer(train_msg_raw.to_list(), truncation=True, padding=True, max_length=512)["input_ids"]
-            test_msg_seq = tokenizer(test_msg_raw.to_list(), truncation=True, padding=True, max_length=512)["input_ids"]
+            train_msg_seq = tokenizer(train_msg_raw.to_list(), truncation=True, padding=True, max_length=maxlen)["input_ids"]
+            test_msg_seq = tokenizer(test_msg_raw.to_list(), truncation=True, padding=True, max_length=maxlen)["input_ids"]
 
         # add padding
         if pad and tokenizer_name.lower() != 'bert':
@@ -77,8 +78,44 @@ class Gutenberg:
             train_msg = train_msg / float(num_tokens)
             test_msg = test_msg / float(num_tokens)
 
+        if verbose:
+            oov_count = sum(token == 1 for seq in train_msg for token in seq)
+            total_tokens = sum(len(seq) for seq in train_msg)
+            oov_percentage = (oov_count / total_tokens) * 100 if total_tokens > 0 else 0
+
+            print(f"Total Tokens: {total_tokens}")
+            print(f"OOV Tokens: {oov_count}")
+            print(f"OOV Percentage: {oov_percentage:.2f}%")
+
         # One-hot encoding of labels
         train_labels = tf.one_hot(train_labels, OUT_DIM)
         test_labels = tf.one_hot(test_labels, OUT_DIM)
 
         return train_msg, test_msg, train_labels, test_labels
+    
+
+if __name__ == "__main__":
+    from vib import VIB
+    gutenberg = Gutenberg()
+    for n in [50, 100, 200, 300, 400, 500]:
+        print(f"Number of words: {n}")
+        data = gutenberg.load_data(min_words=n)
+        print(f"Number of samples: {len(data)}")
+        acc = []
+        for i in range(5):
+            train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.preprocess(data, num_tokens=2048, normalize=False)
+            _data = {'train_data': train_msg_pad, 'test_data': test_msg_pad, 
+                    'train_labels': train_labels, 'test_labels': test_labels}
+        
+            # Instantiate and train the model
+            vib = VIB(encoder_args={'num_layers':2, 'num_units':[128,64]})
+            res = vib.train(_data, epochs=8, batch_size=50, beta=10**-4, alpha=1.0, verbose=False)
+            acc.append(res['Test acc'].iloc[-1])
+            print(f"Trial {i+1}, Accuracy: {res['Test acc'].iloc[-1]:.4f}")
+
+        print(f"Average accuracy: {np.mean(acc):.4f}")
+
+    # for n in [256, 512, 1024, 2048, 4096, 8192]:
+    #     print(f"Number of tokens: {n}")
+    #     data = gutenberg.get_data(num_tokens=n, verbose=True, normalize=False)
+    #     # print(f"Number of samples: {len(data)}")

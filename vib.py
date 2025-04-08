@@ -6,7 +6,7 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from load_gutenberg import Gutenberg
+from load_gutenberg import Gutenberg, OUT_DIM
 
 # Probability distributions
 ds = tfp.distributions
@@ -36,16 +36,17 @@ class Encoder(tf.keras.Model):
         self.use_embedding = use_embedding
 
         if self.use_embedding:
-            self.embed = tf.keras.layers.Embedding(input_dim=1000, output_dim=64)
+            self.embed = tf.keras.layers.Embedding(input_dim=2048, output_dim=64)
             self.flatten = tf.keras.layers.Flatten()
         self.hidden_layers = [tf.keras.layers.Dense(num_units[i], activation='relu') 
                             for i in range(num_layers)]
         self.output_layer = tf.keras.layers.Dense(latent_dim*2) # mu and rho for each latent dimension
     
     def call(self, data):
-        # x = self._layers[0](2 * data - 1)
         if self.use_embedding:
             x = self.flatten(self.embed(data))
+        else: 
+            x = (2 * data - 1)
         for i in range(0, self.num_layers):
             x = self.hidden_layers[i](x)
         output = self.output_layer(x)
@@ -56,7 +57,7 @@ class Encoder(tf.keras.Model):
 
 
 class Decoder(tf.keras.Model):
-    def __init__(self, out_dim: int = 2, num_layers: int = 0, 
+    def __init__(self, out_dim: int = OUT_DIM, num_layers: int = 0, 
                  num_units: Union[int, list[int]] = 16):
         super(Decoder, self).__init__()
 
@@ -91,6 +92,17 @@ def renyi_divergence(p, q, alpha):
     else:
         log_diff = p.log_prob(p.sample()) - q.log_prob(p.sample())
         return (1 / (alpha - 1)) * tf.reduce_logsumexp((alpha - 1) * log_diff)
+    
+
+def renyi_cross_entropy(y, y_pred, alpha):
+    if alpha == 1.0:
+        # print(f"y: {y.shape}, y_pred: {y_pred.shape}")
+        # print(f"y: {y}, y_pred: {y_pred}")
+        return tf.nn.softmax_cross_entropy_with_logits(logits=y_pred, labels=y)
+    elif alpha == float('inf'):
+        return tf.math.log(tf.reduce_sum(y * tf.nn.softmax(y_pred), axis=1))
+    else:
+        return (1 / (alpha-1)) * tf.math.log(tf.reduce_sum(tf.math.pow(y, alpha) * tf.math.pow(tf.nn.softmax(y_pred), 1 - alpha), axis=1))
 
 
 class VIB:
@@ -100,8 +112,8 @@ class VIB:
         self.prior = ds.Normal(0.0, 1.0)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
-    def train(self, data:dict[str, np.array], epochs: int = 25, 
-              batch_size: int = 50, beta: float = 10**-3, alpha: float = 1.0):
+    def train(self, data:dict[str, np.array], epochs: int = 25, batch_size: int = 50, 
+              beta: float = 10**-3, alpha: float = 1.0, verbose: bool = True):
         """
         Train the VIB model
         
@@ -141,14 +153,18 @@ class VIB:
             test_results['Test IZY'].append(IZY); test_results['Test IZX'].append(IZX)
             test_results['Test acc'].append(acc); test_results['Test avg_acc'].append(_acc)
 
-            print(f"Epoch {epoch + 1}, Accuracy: {acc:.4f}, Avg Accuracy: {_acc:.4f}, IZY: {IZY:.2f}, IZX: {IZX:.2f}")
+            if verbose:
+                print(f"Epoch {epoch + 1}, Accuracy: {acc:.4f}, Avg Accuracy: {_acc:.4f}, IZY: {IZY:.2f}, IZX: {IZX:.2f}")
         
         res = merge_dicts({'Epochs':np.arange(epochs)+1}, train_results, test_results)
         return pd.DataFrame(res)
 
     def compute_loss(self, labels, encoding, logits, beta: float, alpha: float = 1):
-        class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
+        # here is non-renyi loss function
+        # class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)) / math.log(2)
         # info_loss = tf.reduce_mean(tfp.distributions.kl_divergence(encoding, self.prior)) / math.log(2)
+        # here is renyi loss function
+        class_loss = tf.reduce_mean(renyi_cross_entropy(labels, logits, alpha)) / math.log(2)
         info_loss = tf.reduce_mean(renyi_divergence(encoding, self.prior, alpha)) / math.log(2)
         total_loss = class_loss + beta * info_loss
         return total_loss, class_loss, info_loss
@@ -190,7 +206,7 @@ class VIB:
 if __name__ == '__main__':
     # load the data
     gutenberg = Gutenberg()
-    train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data(normalize=False)
+    train_msg_pad, test_msg_pad, train_labels, test_labels = gutenberg.get_data(normalize=True)
     data = {'train_data': train_msg_pad, 'test_data': test_msg_pad, 
             'train_labels': train_labels, 'test_labels': test_labels}
 
@@ -198,5 +214,5 @@ if __name__ == '__main__':
     vib = VIB(encoder_args={'num_layers':2, 'num_units':[128,64]})
     
     # Train the model
-    res = vib.train(data, epochs=25, batch_size=50, beta=10**-4, alpha=1.0)
+    res = vib.train(data, epochs=10, batch_size=50, beta=10**-4, alpha=1.0)
     print(res)
