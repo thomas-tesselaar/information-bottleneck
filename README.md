@@ -1,6 +1,10 @@
 # Time Period Text Classification using the Variational Information Bottleneck
 
-Write abstract here
+In recent years, text classification has gained significant attention due to its diverse applications across various domains. One promising approach for improving classification accuracy while mitigating overfitting is the Variational Information Bottleneck (VIB) method. By leveraging the VIB method, this thesis aims to enhance the efficiency of neural networks in the context of text classification tasks. Specifically, this thesis focuses on the challenge of classifying the publication time period of books.
+
+To explore this, we divided each book into paragraphs and used word-level embeddings from a pretrained language model as input to a neural network, with each paragraph labelled according to the book’s publication date. We implemented an Encoder-Decoder architecture and tuned various hyper-parameters such as network depth, the $\beta$ parameter in the IB Objective, and $\alpha$ in Rényi Information Measures to optimize our model's prediction accuracy.
+
+The VIB-based model demonstrated competitive accuracy compared to existing solutions, with an test accuracy of 93.89\% for binary classification, and 82.59\% for quaternary classification. The results highlight the efficacy of using the VIB method to learn compressed, yet informative, representations of textual features relevant to publication periods. This work suggests promising directions for integrating information-theoretic constraints into natural language processing pipelines for historical and literary analysis.
 
 Andrew Sutcliffe, Hamish Spence, Kyle Dong, Joshua Geddes, Thomas Tesselaar
 
