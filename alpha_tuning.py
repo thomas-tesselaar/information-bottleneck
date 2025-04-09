@@ -28,5 +28,5 @@ res = pd.DataFrame({'alpha':alphas,
                     'train std': [np.std(alpha_train_acc[x]) for x in alphas], 
                     'test accuracy': [np.mean(alpha_test_acc[x]) for x in alphas], 
                     'test std': [np.std(alpha_test_acc[x]) for x in alphas]})
-res.to_csv('alpha_tuning_results.csv', index=False)
+res.to_csv('results/alpha_tuning_results.csv', index=False)
 print("Alpha tuning completed. Results saved to 'alpha_tuning_results.csv'.")

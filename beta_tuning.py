@@ -29,5 +29,5 @@ res = pd.DataFrame({'beta':betas,
                     'train std': [np.std(train_acc[x]) for x in betas], 
                     'test accuracy': [np.mean(test_acc[x]) for x in betas], 
                     'test std': [np.std(test_acc[x]) for x in betas]})
-res.to_csv('beta_tuning_results2.csv', index=False)
+res.to_csv('results/beta_tuning_results.csv', index=False)
 print("Beta tuning completed. Results saved to 'beta_tuning_results.csv'.")

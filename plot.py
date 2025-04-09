@@ -1,14 +1,14 @@
 import matplotlib.pyplot as plt
 import pandas as pd 
 
-var = 'alpha'
-var_true = 'α' # 'β' # 
+var = 'epoch'
+var_true = 'epoch' # 'α' # 'β' # 
 
-results = pd.read_csv(f'{var}_tuning_results.csv')
+results = pd.read_csv(f'results/{var}_tuning_results.csv')
 results.set_index(var)[['train accuracy','test accuracy']].mul(100).plot(
     linestyle='--', marker='o')
-plt.xscale('log')
-plt.title(f'Accuracy vs. {var_true} log plot')
+# plt.xscale('log')
+plt.title(f'Accuracy vs. {var_true} plot')
 plt.xlabel(var_true)
 plt.ylabel('Accuracy (%)')
 plt.savefig(f'/Users/thomastesselaar/Downloads/{var}.png', dpi=1200)

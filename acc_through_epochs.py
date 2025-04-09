@@ -27,5 +27,5 @@ res = pd.DataFrame({'epoch':i,
                     'train std': [np.std(train_acc[x]) for x in range(epochs)], 
                     'test accuracy': [np.mean(test_acc[x]) for x in range(epochs)], 
                     'test std': [np.std(test_acc[x]) for x in range(epochs)]})
-res.to_csv('epoch_tuning_results2.csv', index=False)
+res.to_csv('results/epoch_tuning_results.csv', index=False)
 print("Epoch tuning completed. Results saved to 'epoch_tuning_results.csv'.")
